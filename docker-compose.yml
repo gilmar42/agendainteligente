@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: agendaflow-mysql
+    restart: always
+    environment:
+      MYSQL_DATABASE: agendaflow
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  redis:
+    image: redis:alpine
+    container_name: agendaflow-redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+  evolution_api:
+    image: evoapicloud/evolution-api:latest
+    container_name: agendaflow-evolution
+    restart: always
+    environment:
+      - AUTH_TOKEN=agendaflow_token
+      - DATABASE_ENABLED=true
+      - DATABASE_CONNECTION_URI=mysql://root:root@mysql:3306/agendaflow
+      - DATABASE_SAVE_DATA_INSTANCE=true
+      - DATABASE_SAVE_DATA_NEW_MESSAGE=true
+      - DATABASE_SAVE_MESSAGE_UPDATE=true
+      - DATABASE_SAVE_DATA_CONTACTS=true
+      - DATABASE_SAVE_DATA_CHATS=true
+      - DATABASE_SAVE_DATA_LABELS=true
+      - CACHE_REDIS_ENABLED=true
+      - CACHE_REDIS_URI=redis://redis:6379
+      - CACHE_REDIS_PREFIX=EVOLUTION
+    ports:
+      - "8080:8080"
+    depends_on:
+      - mysql
+      - redis
+
+volumes:
+  mysql_data:
