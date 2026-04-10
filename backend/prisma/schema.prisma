@@ -1,32 +1,22 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "mysql"
-  url      = env("DATABASE_URL")
 }
 
 model Workspace {
-  id            String         @id @default(uuid())
+  id            String        @id @default(uuid())
   name          String
-  slug          String         @unique
-  plan          Plan           @default(FREE)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  users         User[]
-  clients       Client[]
+  slug          String        @unique
+  plan          Plan          @default(FREE)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
   appointments  Appointment[]
-  subscriptions Subscription[]
-}
-
-enum Plan {
-  FREE
-  PRO
-  ENTERPRISE
+  clients       Client[]
+  subscriptions Subscription?
+  users         User[]
 }
 
 model User {
@@ -36,42 +26,543 @@ model User {
   name        String
   role        Role      @default(USER)
   workspaceId String
-  workspace   Workspace @relation(fields: [workspaceId], references: [id])
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@index([workspaceId], map: "User_workspaceId_fkey")
+}
+
+model Client {
+  id           String        @id @default(uuid())
+  name         String
+  phone        String        @unique
+  email        String?
+  score        Float         @default(100)
+  workspaceId  String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  appointments Appointment[]
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id])
+  pipelines    Pipeline[]
+
+  @@index([workspaceId], map: "Client_workspaceId_fkey")
+}
+
+model Appointment {
+  id              String            @id @default(uuid())
+  clientId        String
+  workspaceId     String
+  startTime       DateTime
+  endTime         DateTime
+  status          AppointmentStatus @default(PENDING)
+  noShowRisk      Float             @default(0)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  aiContext       String?           @db.Text
+  lastInteraction DateTime?
+  client          Client            @relation(fields: [clientId], references: [id])
+  workspace       Workspace         @relation(fields: [workspaceId], references: [id])
+  messageLogs     MessageLog[]
+
+  @@index([clientId])
+  @@index([workspaceId])
+}
+
+model MessageLog {
+  id            String        @id @default(uuid())
+  appointmentId String
+  type          MessageType
+  status        MessageStatus @default(SENT)
+  content       String        @db.Text
+  createdAt     DateTime      @default(now())
+  appointment   Appointment   @relation(fields: [appointmentId], references: [id])
+
+  @@index([appointmentId], map: "MessageLog_appointmentId_fkey")
+}
+
+model Subscription {
+  id          String             @id @default(uuid())
+  workspaceId String             @unique
+  status      SubscriptionStatus @default(TRIAL)
+  externalId  String?            @unique
+  expiresAt   DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  planType    PlanType           @default(MONTHLY)
+  trialEndsAt DateTime?
+  workspace   Workspace          @relation(fields: [workspaceId], references: [id])
+}
+
+model Pipeline {
+  id          String         @id @default(uuid())
+  clientId    String
+  workspaceId String
+  status      PipelineStatus @default(LEAD)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  client      Client         @relation(fields: [clientId], references: [id])
+
+  @@index([clientId], map: "Pipeline_clientId_fkey")
+}
+
+model Chat {
+  id         String    @id
+  remoteJid  String    @db.VarChar(100)
+  labels     Json?
+  createdAt  DateTime? @default(now()) @db.Timestamp(0)
+  updatedAt  DateTime? @db.Timestamp(0)
+  instanceId String
+  Instance   Instance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@index([instanceId], map: "Chat_instanceId_fkey")
+}
+
+model Chatwoot {
+  id                      String    @id
+  enabled                 Boolean?  @default(true)
+  accountId               String?   @db.VarChar(100)
+  token                   String?   @db.VarChar(100)
+  url                     String?   @db.VarChar(500)
+  nameInbox               String?   @db.VarChar(100)
+  signMsg                 Boolean?  @default(false)
+  signDelimiter           String?   @db.VarChar(100)
+  number                  String?   @db.VarChar(100)
+  reopenConversation      Boolean?  @default(false)
+  conversationPending     Boolean?  @default(false)
+  mergeBrazilContacts     Boolean?  @default(false)
+  importContacts          Boolean?  @default(false)
+  importMessages          Boolean?  @default(false)
+  daysLimitImportMessages Int?
+  organization            String?   @db.VarChar(100)
+  logo                    String?   @db.VarChar(500)
+  createdAt               DateTime? @default(now()) @db.Timestamp(0)
+  updatedAt               DateTime  @db.Timestamp(0)
+  instanceId              String    @unique
+  Instance                Instance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+}
+
+model Contact {
+  id            String    @id
+  remoteJid     String    @db.VarChar(100)
+  pushName      String?   @db.VarChar(100)
+  profilePicUrl String?   @db.VarChar(500)
+  createdAt     DateTime? @default(now()) @db.Timestamp(0)
+  updatedAt     DateTime? @db.Timestamp(0)
+  instanceId    String
+  Instance      Instance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@index([instanceId], map: "Contact_instanceId_fkey")
+}
+
+model Instance {
+  id                      String                    @id
+  name                    String                    @unique @db.VarChar(255)
+  connectionStatus        Instance_connectionStatus @default(open)
+  ownerJid                String?                   @db.VarChar(100)
+  profileName             String?                   @db.VarChar(100)
+  profilePicUrl           String?                   @db.VarChar(500)
+  integration             String?                   @db.VarChar(100)
+  number                  String?                   @db.VarChar(100)
+  businessId              String?                   @db.VarChar(100)
+  token                   String?                   @db.VarChar(255)
+  clientName              String?                   @db.VarChar(100)
+  disconnectionReasonCode Int?
+  disconnectionObject     Json?
+  disconnectionAt         DateTime?                 @db.Timestamp(0)
+  createdAt               DateTime?                 @default(now()) @db.Timestamp(0)
+  updatedAt               DateTime?                 @db.Timestamp(0)
+  Chat                    Chat[]
+  Chatwoot                Chatwoot?
+  Contact                 Contact[]
+  Label                   Label[]
+  Media                   Media[]
+  Message                 Message[]
+  MessageUpdate           MessageUpdate[]
+  Proxy                   Proxy?
+  Rabbitmq                Rabbitmq?
+  Session                 Session?
+  Setting                 Setting?
+  Sqs                     Sqs?
+  Typebot                 Typebot[]
+  TypebotSession          TypebotSession[]
+  TypebotSetting          TypebotSetting?
+  Webhook                 Webhook?
+  Websocket               Websocket?
+}
+
+model Label {
+  id           String    @id
+  labelId      String?   @unique @db.VarChar(100)
+  name         String    @db.VarChar(100)
+  color        String    @db.VarChar(100)
+  predefinedId String?   @db.VarChar(100)
+  createdAt    DateTime? @default(now()) @db.Timestamp(0)
+  updatedAt    DateTime  @db.Timestamp(0)
+  instanceId   String
+  Instance     Instance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@index([instanceId], map: "Label_instanceId_fkey")
+}
+
+model Message {
+  id                           String          @id
+  key                          Json
+  pushName                     String?         @db.VarChar(100)
+  participant                  String?         @db.VarChar(100)
+  messageType                  String          @db.VarChar(100)
+  message                      Json
+  contextInfo                  Json?
+  source                       Message_source
+  messageTimestamp             Int
+  chatwootMessageId            Int?
+  chatwootInboxId              Int?
+  chatwootConversationId       Int?
+  chatwootContactInboxSourceId String?         @db.VarChar(100)
+  chatwootIsRead               Boolean?        @default(false)
+  instanceId                   String
+  typebotSessionId             String?
+  openaiSessionId              String?
+  webhookUrl                   String?         @db.VarChar(500)
+  difySessionId                String?
+  Media                        Media?
+  DifySession                  DifySession?    @relation(fields: [difySessionId], references: [id])
+  Instance                     Instance        @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  OpenaiSession                OpenaiSession?  @relation(fields: [openaiSessionId], references: [id])
+  TypebotSession               TypebotSession? @relation(fields: [typebotSessionId], references: [id])
+  MessageUpdate                MessageUpdate[]
+
+  @@index([difySessionId], map: "Message_difySessionId_fkey")
+  @@index([instanceId], map: "Message_instanceId_fkey")
+  @@index([openaiSessionId], map: "Message_openaiSessionId_fkey")
+  @@index([typebotSessionId], map: "Message_typebotSessionId_fkey")
+}
+
+model MessageUpdate {
+  id          String   @id
+  keyId       String   @db.VarChar(100)
+  remoteJid   String   @db.VarChar(100)
+  fromMe      Boolean
+  participant String?  @db.VarChar(100)
+  pollUpdates Json?
+  status      String   @db.VarChar(30)
+  messageId   String
+  instanceId  String
+  Instance    Instance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  Message     Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([instanceId], map: "MessageUpdate_instanceId_fkey")
+  @@index([messageId], map: "MessageUpdate_messageId_fkey")
+}
+
+model Proxy {
+  id         String    @id
+  enabled    Boolean   @default(false)
+  host       String    @db.VarChar(100)
+  port       String    @db.VarChar(100)
+  protocol   String    @db.VarChar(100)
+  username   String    @db.VarChar(100)
+  password   String    @db.VarChar(100)
+  createdAt  DateTime? @default(now()) @db.Timestamp(0)
+  updatedAt  DateTime  @db.Timestamp(0)
+  instanceId String    @unique
+  Instance   Instance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+}
+
+model Rabbitmq {
+  id         String    @id
+  enabled    Boolean   @default(false)
+  events     Json
+  createdAt  DateTime? @default(now()) @db.Timestamp(0)
+  updatedAt  DateTime  @db.Timestamp(0)
+  instanceId String    @unique
+  Instance   Instance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+}
+
+model Session {
+  id        String   @id
+  sessionId String   @unique
+  creds     String?  @db.Text
+  createdAt DateTime @default(now()) @db.Timestamp(0)
+  Instance  Instance @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+model Setting {
+  id              String    @id
+  rejectCall      Boolean   @default(false)
+  msgCall         String?   @db.VarChar(100)
+  groupsIgnore    Boolean   @default(false)
+  alwaysOnline    Boolean   @default(false)
+  readMessages    Boolean   @default(false)
+  readStatus      Boolean   @default(false)
+  syncFullHistory Boolean   @default(false)
+  createdAt       DateTime? @default(now()) @db.Timestamp(0)
+  updatedAt       DateTime  @db.Timestamp(0)
+  instanceId      String    @unique
+  Instance        Instance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+}
+
+model Sqs {
+  id         String    @id
+  enabled    Boolean   @default(false)
+  events     Json
+  createdAt  DateTime? @default(now()) @db.Timestamp(0)
+  updatedAt  DateTime  @db.Timestamp(0)
+  instanceId String    @unique
+  Instance   Instance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+}
+
+model Typebot {
+  id              String                   @id
+  enabled         Boolean                  @default(true)
+  description     String?                  @db.VarChar(255)
+  url             String                   @db.VarChar(500)
+  typebot         String                   @db.VarChar(100)
+  expire          Int?                     @default(0)
+  keywordFinish   String?                  @db.VarChar(100)
+  delayMessage    Int?
+  unknownMessage  String?                  @db.VarChar(100)
+  listeningFromMe Boolean?                 @default(false)
+  stopBotFromMe   Boolean?                 @default(false)
+  keepOpen        Boolean?                 @default(false)
+  debounceTime    Int?
+  createdAt       DateTime?                @default(now()) @db.Timestamp(0)
+  updatedAt       DateTime?                @db.Timestamp(0)
+  ignoreJids      Json?
+  triggerType     Typebot_triggerType?
+  triggerOperator Typebot_triggerOperator?
+  triggerValue    String?
+  instanceId      String
+  Instance        Instance                 @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  TypebotSession  TypebotSession[]
+  TypebotSetting  TypebotSetting[]
+
+  @@index([instanceId], map: "Typebot_instanceId_fkey")
+}
+
+model TypebotSession {
+  id                 String                @id
+  remoteJid          String                @db.VarChar(100)
+  pushName           String?               @db.VarChar(100)
+  sessionId          String                @db.VarChar(100)
+  status             TypebotSession_status
+  prefilledVariables Json?
+  awaitUser          Boolean               @default(false)
+  createdAt          DateTime?             @default(now()) @db.Timestamp(0)
+  updatedAt          DateTime              @db.Timestamp(0)
+  typebotId          String
+  instanceId         String
+  Message            Message[]
+  Instance           Instance              @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  Typebot            Typebot               @relation(fields: [typebotId], references: [id], onDelete: Cascade)
+
+  @@index([instanceId], map: "TypebotSession_instanceId_fkey")
+  @@index([typebotId], map: "TypebotSession_typebotId_fkey")
+}
+
+model Webhook {
+  id              String    @id
+  url             String    @db.VarChar(500)
+  enabled         Boolean?  @default(true)
+  events          Json?
+  webhookByEvents Boolean?  @default(false)
+  webhookBase64   Boolean?  @default(false)
+  createdAt       DateTime? @default(now()) @db.Timestamp(0)
+  updatedAt       DateTime  @db.Timestamp(0)
+  instanceId      String    @unique
+  Instance        Instance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+}
+
+model Websocket {
+  id         String    @id
+  enabled    Boolean   @default(false)
+  events     Json
+  createdAt  DateTime? @default(now()) @db.Timestamp(0)
+  updatedAt  DateTime  @db.Timestamp(0)
+  instanceId String    @unique
+  Instance   Instance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+}
+
+model Dify {
+  id              String                @id
+  enabled         Boolean               @default(true)
+  description     String?               @db.VarChar(255)
+  botType         Dify_botType
+  apiUrl          String?               @db.VarChar(255)
+  apiKey          String?               @db.VarChar(255)
+  expire          Int?                  @default(0)
+  keywordFinish   String?               @db.VarChar(100)
+  delayMessage    Int?
+  unknownMessage  String?               @db.VarChar(100)
+  listeningFromMe Boolean?              @default(false)
+  stopBotFromMe   Boolean?              @default(false)
+  keepOpen        Boolean?              @default(false)
+  debounceTime    Int?
+  ignoreJids      Json?
+  triggerType     Dify_triggerType?
+  triggerOperator Dify_triggerOperator?
+  triggerValue    String?
+  createdAt       DateTime?             @default(now()) @db.Timestamp(0)
+  updatedAt       DateTime              @db.Timestamp(0)
+  instanceId      String
+}
+
+model DifySession {
+  id         String             @id
+  sessionId  String             @db.VarChar(255)
+  remoteJid  String             @db.VarChar(100)
+  status     DifySession_status
+  awaitUser  Boolean            @default(false)
+  createdAt  DateTime?          @default(now()) @db.Timestamp(0)
+  updatedAt  DateTime           @db.Timestamp(0)
+  difyId     String
+  instanceId String
+  Message    Message[]
+}
+
+model DifySetting {
+  id              String    @id
+  expire          Int?      @default(0)
+  keywordFinish   String?   @db.VarChar(100)
+  delayMessage    Int?
+  unknownMessage  String?   @db.VarChar(100)
+  listeningFromMe Boolean?  @default(false)
+  stopBotFromMe   Boolean?  @default(false)
+  keepOpen        Boolean?  @default(false)
+  debounceTime    Int?
+  ignoreJids      Json?
+  createdAt       DateTime? @default(now()) @db.Timestamp(0)
+  updatedAt       DateTime  @db.Timestamp(0)
+  difyIdFallback  String?   @db.VarChar(100)
+  instanceId      String    @unique
+}
+
+model Media {
+  id         String    @id
+  fileName   String    @unique @db.VarChar(500)
+  type       String    @db.VarChar(100)
+  mimetype   String    @db.VarChar(100)
+  createdAt  DateTime? @default(now()) @db.Timestamp(0)
+  messageId  String    @unique
+  instanceId String
+  Instance   Instance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  Message    Message   @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([instanceId], map: "Media_instanceId_fkey")
+}
+
+model OpenaiBot {
+  id                String                     @id
+  enabled           Boolean                    @default(true)
+  description       String?                    @db.VarChar(255)
+  botType           OpenaiBot_botType
+  assistantId       String?                    @db.VarChar(255)
+  functionUrl       String?                    @db.VarChar(500)
+  model             String?                    @db.VarChar(100)
+  systemMessages    Json?
+  assistantMessages Json?
+  userMessages      Json?
+  maxTokens         Int?
+  expire            Int?                       @default(0)
+  keywordFinish     String?                    @db.VarChar(100)
+  delayMessage      Int?
+  unknownMessage    String?                    @db.VarChar(100)
+  listeningFromMe   Boolean?                   @default(false)
+  stopBotFromMe     Boolean?                   @default(false)
+  keepOpen          Boolean?                   @default(false)
+  debounceTime      Int?
+  ignoreJids        Json?
+  triggerType       OpenaiBot_triggerType?
+  triggerOperator   OpenaiBot_triggerOperator?
+  triggerValue      String?
+  createdAt         DateTime?                  @default(now()) @db.Timestamp(0)
+  updatedAt         DateTime                   @db.Timestamp(0)
+  openaiCredsId     String
+  instanceId        String
+}
+
+model OpenaiCreds {
+  id         String    @id
+  name       String?   @unique @db.VarChar(255)
+  apiKey     String?   @unique @db.VarChar(255)
+  createdAt  DateTime? @default(now()) @db.Timestamp(0)
+  updatedAt  DateTime  @db.Timestamp(0)
+  instanceId String
+}
+
+model OpenaiSession {
+  id          String               @id
+  sessionId   String               @db.VarChar(255)
+  remoteJid   String               @db.VarChar(100)
+  status      OpenaiSession_status
+  awaitUser   Boolean              @default(false)
+  createdAt   DateTime?            @default(now()) @db.Timestamp(0)
+  updatedAt   DateTime             @db.Timestamp(0)
+  openaiBotId String
+  instanceId  String
+  Message     Message[]
+}
+
+model OpenaiSetting {
+  id               String    @id
+  expire           Int?      @default(0)
+  keywordFinish    String?   @db.VarChar(100)
+  delayMessage     Int?
+  unknownMessage   String?   @db.VarChar(100)
+  listeningFromMe  Boolean?  @default(false)
+  stopBotFromMe    Boolean?  @default(false)
+  keepOpen         Boolean?  @default(false)
+  debounceTime     Int?
+  ignoreJids       Json?
+  speechToText     Boolean?  @default(false)
+  createdAt        DateTime? @default(now()) @db.Timestamp(0)
+  updatedAt        DateTime  @db.Timestamp(0)
+  openaiCredsId    String    @unique
+  openaiIdFallback String?   @db.VarChar(100)
+  instanceId       String    @unique
+}
+
+model Template {
+  id         String    @id
+  templateId String    @unique @db.VarChar(255)
+  name       String    @unique @db.VarChar(255)
+  template   Json
+  webhookUrl String?   @db.VarChar(500)
+  createdAt  DateTime? @default(now()) @db.Timestamp(0)
+  updatedAt  DateTime  @db.Timestamp(0)
+  instanceId String
+}
+
+model TypebotSetting {
+  id                String    @id
+  expire            Int?      @default(0)
+  keywordFinish     String?   @db.VarChar(100)
+  delayMessage      Int?
+  unknownMessage    String?   @db.VarChar(100)
+  listeningFromMe   Boolean?  @default(false)
+  stopBotFromMe     Boolean?  @default(false)
+  keepOpen          Boolean?  @default(false)
+  debounceTime      Int?
+  typebotIdFallback String?   @db.VarChar(100)
+  ignoreJids        Json?
+  createdAt         DateTime? @default(now()) @db.Timestamp(0)
+  updatedAt         DateTime  @db.Timestamp(0)
+  instanceId        String    @unique
+  Instance          Instance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  Typebot           Typebot?  @relation(fields: [typebotIdFallback], references: [id])
+
+  @@index([typebotIdFallback], map: "TypebotSetting_typebotIdFallback_fkey")
+}
+
+enum Plan {
+  FREE
+  PRO
+  ENTERPRISE
 }
 
 enum Role {
   ADMIN
   USER
-}
-
-model Client {
-  id          String      @id @default(uuid())
-  name        String
-  phone       String
-  score       Float       @default(100.0)
-  workspaceId String
-  workspace   Workspace   @relation(fields: [workspaceId], references: [id])
-  pipelines   Pipeline[]
-  appointments Appointment[]
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-}
-
-model Appointment {
-  id            String             @id @default(uuid())
-  clientId      String
-  client        Client             @relation(fields: [clientId], references: [id])
-  workspaceId   String
-  workspace     Workspace          @relation(fields: [workspaceId], references: [id])
-  startTime     DateTime
-  endTime       DateTime
-  status        AppointmentStatus  @default(PENDING)
-  noShowRisk    Float              @default(0.0)
-  messageLogs   MessageLog[]
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
 }
 
 enum AppointmentStatus {
@@ -80,16 +571,6 @@ enum AppointmentStatus {
   CANCELLED
   COMPLETED
   NO_SHOW
-}
-
-model MessageLog {
-  id            String        @id @default(uuid())
-  appointmentId String
-  appointment   Appointment   @relation(fields: [appointmentId], references: [id])
-  type          MessageType
-  status        MessageStatus @default(SENT)
-  content       String        @db.Text
-  createdAt     DateTime      @default(now())
 }
 
 enum MessageType {
@@ -105,36 +586,107 @@ enum MessageStatus {
   FAILED
 }
 
-model Subscription {
-  id          String             @id @default(uuid())
-  workspaceId String
-  workspace   Workspace          @relation(fields: [workspaceId], references: [id])
-  status      SubscriptionStatus @default(ACTIVE)
-  planId      String
-  externalId  String?            // Stripe/MercadoPago ID
-  expiresAt   DateTime?
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
-}
-
 enum SubscriptionStatus {
+  TRIAL
   ACTIVE
+  PAST_DUE
   EXPIRED
   CANCELLED
 }
 
-model Pipeline {
-  id          String         @id @default(uuid())
-  clientId    String
-  client      Client         @relation(fields: [clientId], references: [id])
-  workspaceId String
-  status      PipelineStatus @default(LEAD)
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+enum PlanType {
+  MONTHLY
+  ANNUAL
 }
 
 enum PipelineStatus {
   LEAD
   PROSPECT
   CONVERTED
+}
+
+enum Instance_connectionStatus {
+  open
+  close
+  connecting
+}
+
+enum TypebotSession_status {
+  opened
+  closed
+  paused
+}
+
+enum Message_source {
+  ios
+  android
+  web
+  unknown
+  desktop
+}
+
+enum Typebot_triggerType {
+  all
+  keyword
+  none
+}
+
+enum Typebot_triggerOperator {
+  contains
+  equals
+  startsWith
+  endsWith
+  regex
+}
+
+enum Dify_botType {
+  chatBot
+  textGenerator
+  agent
+  workflow
+}
+
+enum DifySession_status {
+  opened
+  closed
+  paused
+}
+
+enum OpenaiBot_botType {
+  assistant
+  chatCompletion
+}
+
+enum OpenaiSession_status {
+  opened
+  closed
+  paused
+}
+
+enum Dify_triggerType {
+  all
+  keyword
+  none
+}
+
+enum Dify_triggerOperator {
+  contains
+  equals
+  startsWith
+  endsWith
+  regex
+}
+
+enum OpenaiBot_triggerType {
+  all
+  keyword
+  none
+}
+
+enum OpenaiBot_triggerOperator {
+  contains
+  equals
+  startsWith
+  endsWith
+  regex
 }

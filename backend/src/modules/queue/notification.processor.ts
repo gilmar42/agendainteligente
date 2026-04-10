@@ -19,40 +19,54 @@ export class NotificationProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job<any>): Promise<any> {
+  async process(job: Job<{ appointmentId: string }>): Promise<void> {
     const { appointmentId } = job.data;
+
     const appointment = await this.prisma.appointment.findUnique({
       where: { id: appointmentId },
-      include: { client: true },
+      include: { client: true, workspace: true },
     });
 
     if (!appointment || !appointment.client) {
-      this.logger.error(
-        `Appointment ${appointmentId} not found or client missing`,
-      );
+      this.logger.error(`Agendamento ${appointmentId} não encontrado ou sem cliente`);
       return;
     }
 
     if (job.name === 'send-confirmation') {
-      const message = await this.aiService.generateConfirmationMessage(
-        'WhatsApp',
-        appointment.client.name,
-        appointment.startTime.toISOString(),
-      );
+      try {
+        // Gera mensagem de confirmação com nome da clínica
+        const message = await this.aiService.generateConfirmationMessage(
+          'WhatsApp',
+          appointment.client.name,
+          appointment.startTime.toISOString(),
+          appointment.workspace?.name,
+        );
 
-      await this.whatsappService.sendMessage(appointment.client.phone, message);
+        await this.whatsappService.sendMessage(appointment.client.phone, message);
 
-      // Log the message
-      await this.prisma.messageLog.create({
-        data: {
-          appointmentId: appointment.id,
-          content: message,
-          type: MessageType.CONFIRMATION,
-          status: MessageStatus.SENT,
-        },
-      });
+        await this.prisma.messageLog.create({
+          data: {
+            appointmentId: appointment.id,
+            content: message,
+            type: MessageType.CONFIRMATION,
+            status: MessageStatus.SENT,
+          },
+        });
 
-      this.logger.log(`Confirmation sent for appointment ${appointmentId}`);
+        this.logger.log(`✅ Confirmação enviada para ${appointment.client.name} (${appointment.client.phone})`);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.error(`❌ Erro ao enviar confirmação para ${appointment.id}: ${msg}`);
+
+        await this.prisma.messageLog.create({
+          data: {
+            appointmentId: appointment.id,
+            content: 'Falha no envio da confirmação',
+            type: MessageType.CONFIRMATION,
+            status: MessageStatus.FAILED,
+          },
+        });
+      }
     }
   }
 }

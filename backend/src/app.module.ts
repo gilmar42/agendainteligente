@@ -10,6 +10,10 @@ import { AppointmentsModule } from './modules/appointments/appointments.module';
 import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
 import { AIModule } from './modules/ai/ai.module';
 import { QueueModule } from './modules/queue/queue.module';
+import { BillingModule } from './modules/billing/billing.module';
+import { DashboardController } from './modules/dashboard/dashboard.controller';
+import { DashboardService } from './modules/dashboard/dashboard.service';
+import { SchedulerModule } from './modules/scheduler/scheduler.module';
 
 @Module({
   imports: [
@@ -22,8 +26,10 @@ import { QueueModule } from './modules/queue/queue.module';
     WhatsappModule,
     AIModule,
     QueueModule,
+    BillingModule,
+    SchedulerModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
+  controllers: [AppController, DashboardController],
+  providers: [AppService, DashboardService],
 })
 export class AppModule {}

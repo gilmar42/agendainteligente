@@ -1,27 +1,125 @@
-import { CheckCircle2, XCircle, AlertCircle, TrendingUp } from 'lucide-react';
+'use client';
 
-const stats = [
-  { label: 'Total Agendamentos', value: '124', icon: CheckCircle2, color: 'text-blue-400', bg: 'bg-blue-400/10' },
-  { label: 'Confirmados', value: '102', icon: TrendingUp, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
-  { label: 'No-Shows Evitados', value: '12', icon: AlertCircle, color: 'text-yellow-400', bg: 'bg-yellow-400/10' },
-  { label: 'Cancelados', value: '10', icon: XCircle, color: 'text-rose-400', bg: 'bg-rose-400/10' },
-];
+import { useState, useEffect } from 'react';
+import { 
+  Users, 
+  CheckCircle2, 
+  AlertCircle, 
+  XCircle,
+  TrendingUp,
+  TrendingDown,
+  Loader2
+} from 'lucide-react';
 
 export default function DashboardStats() {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-      {stats.map((stat) => (
-        <div key={stat.label} className="bg-slate-900 border border-slate-800 p-6 rounded-2xl hover:border-slate-700 transition-all">
-          <div className="flex items-center justify-between mb-4">
-            <div className={`p-2 rounded-lg ${stat.bg}`}>
-              <stat.icon className={stat.color} size={24} />
-            </div>
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Mês Atual</span>
+  const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchStats() {
+      try {
+        const token = localStorage.getItem('access_token');
+        const res = await fetch('http://127.0.0.1:3001/dashboard/stats', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setStats(data);
+        }
+      } catch (err) {
+        console.error('Erro ao buscar stats', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchStats();
+  }, []);
+
+  const items = [
+    { 
+      label: 'Total Agendamentos', 
+      value: stats?.total || 0, 
+      icon: Users, 
+      color: 'blue',
+      trend: '+12%',
+      isUp: true
+    },
+    { 
+      label: 'Confirmados', 
+      value: stats?.confirmed || 0, 
+      icon: CheckCircle2, 
+      color: 'emerald',
+      trend: '+8%',
+      isUp: true
+    },
+    { 
+      label: 'No-Shows Evitados', 
+      value: stats?.avoided || 0, 
+      icon: AlertCircle, 
+      color: 'amber',
+      trend: stats?.avoided > 0 ? '+24%' : '0%',
+      isUp: true
+    },
+    { 
+      label: 'Cancelamentos', 
+      value: stats?.cancelled || 0, 
+      icon: XCircle, 
+      color: 'rose',
+      trend: '-3%',
+      isUp: false
+    },
+  ];
+
+  const colorVariants: Record<string, string> = {
+    blue: 'text-blue-400 bg-blue-500/10',
+    emerald: 'text-emerald-400 bg-emerald-500/10',
+    amber: 'text-amber-400 bg-amber-500/10',
+    rose: 'text-rose-400 bg-rose-500/10',
+  };
+
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="glass-card h-40 rounded-[2rem] flex items-center justify-center animate-pulse">
+            <Loader2 className="animate-spin text-slate-800" size={24} />
           </div>
-          <p className="text-3xl font-bold text-white mb-1">{stat.value}</p>
-          <p className="text-sm text-slate-400">{stat.label}</p>
-        </div>
-      ))}
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {items.map((stat, i) => {
+        const Icon = stat.icon;
+        const colorClass = colorVariants[stat.color] || colorVariants.blue;
+
+        return (
+          <div 
+            key={stat.label} 
+            className="glass-card p-6 rounded-[2rem] relative overflow-hidden group animate-in"
+            style={{ animationDelay: `${i * 100}ms` }}
+          >
+            <div className="flex justify-between items-start mb-6">
+              <div className={`p-3 rounded-2xl ${colorClass}`}>
+                <Icon size={24} />
+              </div>
+              <div className={`flex items-center space-x-1 text-[10px] font-black px-2 py-1 rounded-full ${stat.isUp ? 'text-emerald-400 bg-emerald-500/5' : 'text-rose-400 bg-rose-500/5'}`}>
+                {stat.isUp ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                <span>{stat.trend}</span>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">{stat.label}</p>
+              <h3 className="text-3xl font-black text-white tracking-tighter">{stat.value}</h3>
+            </div>
+            
+            <div className="absolute -right-4 -bottom-4 w-24 h-24 blur-[60px] rounded-full bg-blue-500 opacity-5 pointer-events-none group-hover:opacity-10 transition-opacity" />
+          </div>
+        );
+      })}
     </div>
   );
 }

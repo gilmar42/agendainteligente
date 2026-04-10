@@ -1,3 +1,5 @@
+'use client';
+
 import Sidebar from '@/components/Sidebar';
 
 export default function DashboardLayout({
@@ -6,17 +8,19 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex h-screen bg-slate-950 font-sans text-slate-100 antialiased">
+    <div className="flex h-screen bg-[#020617] overflow-hidden text-slate-200">
+      {/* Background Decorative Elements */}
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/10 blur-[120px] rounded-full" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[30%] h-[30%] bg-indigo-600/10 blur-[120px] rounded-full" />
+      </div>
+
       <Sidebar />
-      <main className="flex-1 overflow-y-auto p-8 relative">
-        <div className="absolute top-0 right-0 p-8">
-          <div className="flex items-center space-x-2 text-sm text-slate-400">
-            <span>Home</span>
-            <span>/</span>
-            <span className="text-blue-400">Dashboard</span>
-          </div>
+      
+      <main className="flex-1 ml-64 overflow-y-auto relative">
+        <div className="p-8 lg:p-12 max-w-7xl mx-auto">
+          {children}
         </div>
-        {children}
       </main>
     </div>
   );

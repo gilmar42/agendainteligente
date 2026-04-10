@@ -11,6 +11,7 @@ import {
 import { AppointmentsService } from './appointments.service';
 import { AppointmentStatus, Prisma } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { SubscriptionGuard } from '../auth/guards/subscription.guard';
 
 interface UserRequest extends Request {
   user: {
@@ -22,7 +23,7 @@ interface UserRequest extends Request {
 }
 
 @Controller('appointments')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, SubscriptionGuard)
 export class AppointmentsController {
   constructor(private readonly appointmentsService: AppointmentsService) {}
 
